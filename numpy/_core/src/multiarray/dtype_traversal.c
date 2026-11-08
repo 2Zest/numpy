@@ -358,9 +358,16 @@ get_fields_traverse_function(
             continue;
         }
         NPY_ARRAYMETHOD_FLAGS clear_flags;
-        if (get_traverse_func(
+        int res;
+        if (Py_EnterRecursiveCall(" while building a dtype traversal") != 0) {
+            NPY_AUXDATA_FREE((NpyAuxData *)data);
+            return -1;
+        }
+        res = get_traverse_func(
                 traverse_context, fld_dtype, 0,
-                stride, &field->info, &clear_flags) < 0) {
+                stride, &field->info, &clear_flags);
+        Py_LeaveRecursiveCall();
+        if (res < 0) {
             NPY_AUXDATA_FREE((NpyAuxData *)data);
             return -1;
         }
@@ -464,9 +471,16 @@ get_subarray_traverse_func(
     auxdata->base.free = &subarray_traverse_data_free;
     auxdata->base.clone = &subarray_traverse_data_clone;
 
-    if (get_traverse_func(
+    int res;
+    if (Py_EnterRecursiveCall(" while building a dtype traversal") != 0) {
+        PyMem_Free(auxdata);
+        return -1;
+    }
+    res = get_traverse_func(
             traverse_context, dtype, aligned,
-            dtype->elsize, &auxdata->info, flags) < 0) {
+            dtype->elsize, &auxdata->info, flags);
+    Py_LeaveRecursiveCall();
+    if (res < 0) {
         PyMem_Free(auxdata);
         return -1;
     }
