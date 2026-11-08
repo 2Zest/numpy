@@ -946,6 +946,33 @@ class TestMonsterType:
         finally:
             threading.stack_size(old_stack_size)
 
+    @pytest.mark.thread_unsafe(reason="Sets global threading stack size")
+    @pytest.mark.skipif(IS_WASM, reason="wasm doesn't have support for threads")
+    def test_deep_structured_dtype_array_creation(self):
+        import threading
+
+        errors = []
+
+        def build_and_create():
+            dtype = np.dtype([("v", "i4")])
+            for _ in range(50000):
+                dtype = np.dtype([("v", "i4"), ("next", dtype)])
+            try:
+                np.zeros(1, dtype=dtype)
+            except Exception as exc:
+                errors.append(exc)
+
+        old_stack_size = threading.stack_size(1024 * 1024)
+        try:
+            thread = threading.Thread(target=build_and_create)
+            thread.start()
+            thread.join()
+        finally:
+            threading.stack_size(old_stack_size)
+
+        assert len(errors) == 1
+        assert isinstance(errors[0], RecursionError)
+
     @requires_deep_recursion
     def test_dict_recursion(self):
         d = {"names": ['self'], "formats": [None], "offsets": [0]}
